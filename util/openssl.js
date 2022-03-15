@@ -25,8 +25,6 @@ function writeTmpFile ( content ) {
 
     const savePath = path.join ( xPath, filename )
 
-    console.log ( 'save:', savePath )
-
     if ( fs.existsSync ( savePath ) ) return savePath
     
     fs.writeFileSync ( savePath, content )
