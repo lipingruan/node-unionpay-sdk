@@ -1,0 +1,24 @@
+{
+  "name": "@lipingruan/node-unionpay-sdk",
+  "private": false,
+  "version": "0.0.1",
+  "description": "nodejs unionpay sdk",
+  "main": "unionpay.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lipingruan/node-unionpay-sdk.git"
+  },
+  "keywords": [],
+  "author": "lipingruan",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lipingruan/node-unionpay-sdk/issues"
+  },
+  "homepage": "https://github.com/lipingruan/node-unionpay-sdk#readme",
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
+  }
+}
