@@ -105,3 +105,6 @@ dist
 
 # Test dir
 test
+
+# IDEA files
+.idea

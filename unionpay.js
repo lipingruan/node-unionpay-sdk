@@ -1,4 +1,6 @@
 
+const fs = require ( 'fs' )
+
 const crypto = require ( 'crypto' )
 
 const IO = require ( './util/io' )
@@ -20,6 +22,11 @@ module.exports = class Unionpay {
         version: '5.1.0',
         encoding: 'UTF-8',
 
+        // 商户证书
+        certification: '',
+        // 商户证书密钥
+        certificationPassword: '',
+
         // 商户公私钥
         publicKey: '',
         privateKey: '',
@@ -36,21 +43,31 @@ module.exports = class Unionpay {
 
         // 消费后台回调地址
         consumeCallbackUrl: '',
-        
-        // 消费前台回调地址
-        consumeTargetUrl: '',
 
         /**
-         * @type {number} 0:直连,1:服务商,2:平台商户
+         * 0:直连,1:服务商,2:平台商户
+         * @type {string}
          */
         accessType: '0',
 
-        // 渠道类型
-        channelType: '08',
+        /**
+         * 07:PC/平板,09:手机
+         * @type {string}
+         */
+        channelType: '07',
 
-        // 货币类型, 156: 人民币
+        /**
+         * 货币类型, 156:人民币
+         * @type {string}
+         */
         currencyCode: '156',
+    }
 
+
+
+    constructor ( config ) {
+
+        if ( config ) this.config = config
     }
 
 
@@ -58,6 +75,35 @@ module.exports = class Unionpay {
     set config ( config ) {
 
         Object.assign ( this.config, config )
+
+        const { certification, certificationPassword, unionpayRootCA, unionpayMiddleCA } = this.#config
+
+        if ( 'string' === typeof certification ) {
+
+            const serialNumber = openssl.getSerialNumberFromCert ( certification, {
+                password: certificationPassword
+            } )
+
+            this.#config.certId = String ( parseInt ( serialNumber, 16 ) )
+
+            const { key: publicKey } = openssl.getKeyFromCert ( certification, 'publicKey', {
+                password: certificationPassword,
+                returnsKey: true
+            } )
+
+            this.#config.publicKey = publicKey
+
+            const { key: privateKey } = openssl.getKeyFromCert ( certification, 'privateKey', {
+                password: certificationPassword,
+                returnsKey: true
+            } )
+
+            this.#config.privateKey = privateKey
+        }
+
+        if ( !openssl.isCertification ( unionpayRootCA ) ) this.#config.unionpayRootCA = fs.readFileSync ( unionpayRootCA )
+
+        if ( !openssl.isCertification ( unionpayMiddleCA ) ) this.#config.unionpayMiddleCA = fs.readFileSync ( unionpayMiddleCA )
     }
 
 
@@ -208,16 +254,18 @@ module.exports = class Unionpay {
      * @param {{
      * orderId: string,
      * amount: number,
-     * attach: string,
-     * description: string,
-     * }} form 
+     * attach?: *,
+     * description?: string,
+     * channelType?: string,
+     * consumeTargetUrl?: string,
+     * }} form
      * @returns {Promise<{redirect:string}>}
      */
     async frontTransReq ( form ) {
 
-        const { orderId, amount, description, attach } = form
+        const { orderId, amount, description, attach, channelType: newChannelType, consumeTargetUrl } = form
 
-        const { certId, merId, encoding, version, accessType, channelType, currencyCode, consumeCallbackUrl, consumeTargetUrl } = this.config
+        const { certId, merId, encoding, version, accessType, channelType, currencyCode, consumeCallbackUrl } = this.config
 
         const now = new Date
 
@@ -225,7 +273,9 @@ module.exports = class Unionpay {
         
         const sendBody = {
             certId, merId, encoding, version, 
-            accessType, channelType, currencyCode, 
+            accessType,
+            channelType: newChannelType || channelType,
+            currencyCode,
             backUrl: consumeCallbackUrl,
             frontUrl: consumeTargetUrl,
             bizType: '000201',

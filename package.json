@@ -1,7 +1,7 @@
 {
   "name": "@lipingruan/node-unionpay-sdk",
   "private": false,
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "nodejs unionpay sdk",
   "main": "unionpay.js",
   "scripts": {
@@ -18,7 +18,5 @@
     "url": "https://github.com/lipingruan/node-unionpay-sdk/issues"
   },
   "homepage": "https://github.com/lipingruan/node-unionpay-sdk#readme",
-  "dependencies": {
-    "iconv-lite": "^0.6.3"
-  }
+  "dependencies": {}
 }

@@ -1,54 +1,30 @@
 
 const child_process = require ( 'child_process' )
 
-const path = require ( 'path' )
-
-const os = require ( 'os' )
-
 const fs = require ( 'fs' )
 
-const crypto = require ( 'crypto' )
+const IO = require ( './io' )
 
 
-/**
- * 写入临时文件, 返回文件地址
- * @param {Buffer|string} content 
- * @returns {string}
- */
-function writeTmpFile ( content ) {
 
-    const xPath = os.tmpdir ( )
+exports.isCertification = ( certification ) => {
 
-    const md5 = crypto.createHash ( 'md5' ).update ( content ).digest ( 'hex' )
-
-    const filename = `cert_${md5}.pem`
-
-    const savePath = path.join ( xPath, filename )
-
-    if ( fs.existsSync ( savePath ) ) return savePath
-    
-    fs.writeFileSync ( savePath, content )
-
-    return savePath
-}
-
-
-function isCertification ( cert ) {
-
-    return Buffer.isBuffer ( cert ) || (
-        'string' === typeof cert && cert.startsWith ( '-----' )
+    return Buffer.isBuffer ( certification ) || (
+        'string' === typeof certification && certification.startsWith ( '-----' )
     )
 }
+
 
 
 /**
  * 验证证书链合法性
  * @param {string} certification 
- * @param {[string]|string} CA 
+ * @param {[string]|string} CA
+ * @returns {boolean}
  */
 exports.verifySigningChain = ( certification, CA ) => {
 
-    if ( isCertification ( certification ) ) certification = writeTmpFile ( certification )
+    if ( exports.isCertification ( certification ) ) certification = IO.writeTmpFile ( certification )
 
     let rootCA = '', middleCA = [ ]
 
@@ -62,14 +38,14 @@ exports.verifySigningChain = ( certification, CA ) => {
 
             const xCA = CA [ index ]
 
-            if ( isCertification ( xCA ) ) CA [ index ] = writeTmpFile ( xCA )
+            if ( exports.isCertification ( xCA ) ) CA [ index ] = IO.writeTmpFile ( xCA )
         }
 
         rootCA = CA [ 0 ]
         middleCA = CA.slice ( 1 )
     } else {
 
-        if ( isCertification ( CA ) ) CA = writeTmpFile ( CA )
+        if ( exports.isCertification ( CA ) ) CA = IO.writeTmpFile ( CA )
 
         rootCA = CA
     }
@@ -90,10 +66,79 @@ exports.verifySigningChain = ( certification, CA ) => {
         certification,
     ]
 
-    const result = child_process.spawnSync ( 'openssl', params )
+    const task = child_process.spawnSync ( 'openssl', params )
 
-    const stdout = result.stdout.toString ( ).trim ( )
+    const stdout = task.stdout.toString ( ).trim ( )
 
     return stdout.endsWith ( 'OK' )
 }
 
+
+
+/**
+ * 从 pfx 导出RSA密钥
+ * @param {Buffer|string} certification
+ * @param {'publicKey'|'privateKey'} type
+ * @param options
+ * @param {string?} options.password
+ * @param {boolean?} options.returnsKey
+ * @returns {{path:string,key?:Buffer}}
+ */
+exports.getKeyFromCert = ( certification, type = 'privateKey', options = { } ) => {
+
+    const { password, returnsKey } = options
+
+    if ( Buffer.isBuffer ( certification ) ) certification = IO.writeTmpFile ( certification )
+
+    const tmpFile = IO.getTmpFile ( )
+
+    const params = [ 'rsa', '-in', certification, '-out', tmpFile ]
+
+    if ( type === 'publicKey' ) params.push ( '-pubout' )
+
+    if ( password ) params.push ( '-passin', 'pass:' + password )
+
+    const task = child_process.spawnSync ( 'openssl', params )
+
+    const stdout = task.stdout.toString ( ).trim ( )
+
+    const stderr = task.stderr.toString ( ).trim ( )
+
+    const success = stdout.includes ( 'writing RSA key' ) || stderr.includes ( 'writing RSA key' )
+
+    if ( !success ) throw new Error ( 'PublicKey writing fail' )
+
+    const result = { path: tmpFile }
+
+    if ( returnsKey ) result.key = fs.readFileSync ( tmpFile )
+
+    return result
+}
+
+
+
+/**
+ * 获取证书序列号
+ * @param certification
+ * @param options
+ * @param {string?} options.password
+ * @returns {string}
+ */
+exports.getSerialNumberFromCert = ( certification, options = {　} ) => {
+
+    const { password } = options
+
+    if ( Buffer.isBuffer ( certification ) ) certification = IO.writeTmpFile ( certification )
+
+    const params = [ 'x509', '-in', certification, '-serial', '-nocert' ]
+
+    if ( password ) params.push ( '-passin', 'pass:' + password )
+
+    const task = child_process.spawnSync ( 'openssl', params )
+
+    const stdout = task.stdout.toString ( ).trim ( )
+
+    if ( !stdout.startsWith ( 'serial=' ) ) throw new Error ( 'Cannot read serial number' )
+
+    return stdout.slice ( 7 ).trim ( )
+}

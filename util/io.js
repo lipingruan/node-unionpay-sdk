@@ -12,7 +12,62 @@ const https = require ( 'https' );
 
 const querystring = require ( 'querystring' );
 
-const iconv = require ( 'iconv-lite' );
+const os = require ( 'os' );
+
+const crypto = require ( 'crypto' );
+
+const path = require ( 'path' );
+
+const fs = require ( 'fs' );
+
+
+
+/**
+ * 写入临时文件, 返回文件地址
+ * @param {Buffer|string} content
+ * @param {string?} extension
+ * @returns {string}
+ */
+exports.writeTmpFile = ( content, extension = 'tmp' ) => {
+
+  const xPath = os.tmpdir ( )
+
+  const md5 = crypto.createHash ( 'md5' ).update ( content ).digest ( 'hex' )
+
+  const filename = [ md5, extension ].join ( '.' )
+
+  const savePath = path.join ( xPath, filename )
+
+  if ( fs.existsSync ( savePath ) ) return savePath
+
+  fs.writeFileSync ( savePath, content )
+
+  return savePath
+}
+
+
+
+/**
+ * 生成临时文件地址
+ * @param {string?} extension
+ * @returns {string}
+ */
+exports.getTmpFile = ( extension ) => {
+
+  const xPath = os.tmpdir ( )
+
+  const pid = process.pid.toString( 16 ).padStart ( 4, '0' )
+
+  const time = Date.now ( ).toString ( 16 ).padStart ( 11, '0' )
+
+  const rnd = String ( Math.floor ( Math.random ( ) * 1000 ) ).padStart ( 3, '0' )
+
+  let filename = [ pid, time, rnd ].join ( '_' )
+
+  if ( extension ) filename += '.' + extension
+
+  return path.join ( xPath, filename )
+}
 
 
 
@@ -110,7 +165,9 @@ exports.parseBody = async function ( request ) {
 
   if ( charset !== 'utf8' && charset !== 'utf-8' ) {
 
-    string = iconv.decode ( buffer, charset )
+    const decoder = new TextDecoder ( charset )
+
+    string = decoder.decode ( buffer )
   } else string = buffer.toString ( )
 
   try {
