@@ -233,6 +233,8 @@ module.exports = class Unionpay {
      */
     getResponseVerify ( form ) {
 
+        if ( form.merId !== this.config.merId ) return false
+
         const publicKey = form.signPubKeyCert
 
         const signVerified = this.getFormVerify ( form, publicKey )
