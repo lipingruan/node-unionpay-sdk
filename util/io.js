@@ -195,9 +195,10 @@ exports.parseBody = async function ( request ) {
 
 /**
  * http(s) request
- * @param {http.RequestOptions|https.RequestOptions|URL|String} options 
+ * @param {http.RequestOptions|https.RequestOptions|URL|String} options
+ * @param {String|URL} options.url
  * @param {*} body 
- * @param {'json'|'form'} bodyType
+ * @param {'json'|'form'|'text'} bodyType
  * @returns {Promise<{body:*,headers:http.IncomingHttpHeaders}>}
  */
 exports.http = function ( options, body, bodyType = 'json' ) {
@@ -229,12 +230,18 @@ exports.http = function ( options, body, bodyType = 'json' ) {
       } else resolve ( { headers } )
     };
 
-    const isHTTPS = 'string' === typeof options ? options.indexOf ( 'https' ) === 0 :
-    'object' === typeof options ? options.protocol.indexOf ( 'https' ) === 0 : false;
+    const isHTTPS =
+        'string' === typeof options ?
+            options.startsWith ( 'https' ) :
+            'object' === typeof options ?
+                options.url ?
+                    'string' === typeof options.url ? options.url.startsWith ( 'https' ) : options.url.protocol === 'https:' :
+                    options.protocol === 'https:'
+                : false;
 
     const request = isHTTPS ?
-    https.request ( options, callback ) :
-    http.request ( options, callback );
+    options.url ? https.request ( options.url, options, callback ) : https.request ( options, callback ) :
+    options.url ? http.request ( options.url, options, callback ) : http.request ( options, callback );
     
     if ( body ) {
 
@@ -247,9 +254,14 @@ exports.http = function ( options, body, bodyType = 'json' ) {
           bodyString = querystring.stringify ( body )
           break
 
-        default:
+        case 'json':
           request.setHeader ( 'Content-Type', 'application/json' )
           bodyString = JSON.stringify ( body )
+          break
+
+        default:
+          request.setHeader ( 'Content-Type', 'text/plain' )
+          bodyString = String ( body )
           break
       }
 
