@@ -18,7 +18,7 @@ exports.isCertification = ( certification ) => {
 
 /**
  * 验证证书链合法性
- * @param {string} certification 
+ * @param {string|Buffer} certification
  * @param {[string]|string} CA
  * @returns {boolean}
  */
@@ -55,8 +55,7 @@ exports.verifySigningChain = ( certification, CA ) => {
         '-verbose',
         '-CAfile',
         rootCA,
-        '-untrusted',
-        ...middleCA,
+        ...middleCA.map ( ca => [ '-untrusted', ca ] ).flat ( ),
         certification,
     ] : [
         'verify',
@@ -70,7 +69,39 @@ exports.verifySigningChain = ( certification, CA ) => {
 
     const stdout = task.stdout.toString ( ).trim ( )
 
+    const stderr = task.stderr.toString ( ).trim ( )
+
     return stdout.endsWith ( 'OK' )
+}
+
+
+
+/**
+ * convert pkcs12 file to x509 pem format
+ * @param {string|Buffer} certification
+ * @param options
+ * @param {string?} options.password
+ * @returns {string}
+ */
+exports.getX509FromPKCS12 = ( certification, options ) => {
+
+    const { password } = options
+
+    if ( Buffer.isBuffer ( certification ) ) certification = IO.writeTmpFile ( certification )
+
+    const savePath = IO.getTmpFile ( 'pem' )
+
+    const params = [ 'pkcs12', '-in', certification, '-nodes', '-out', savePath ]
+
+    if ( password ) params.push ( '-passin', 'pass:' + password )
+
+    const task = child_process.spawnSync ( 'openssl', params )
+
+    const stderr = task.stderr.toString ( ).trim ( )
+
+    if ( stderr ) throw new Error ( stderr )
+
+    return savePath
 }
 
 
@@ -84,13 +115,13 @@ exports.verifySigningChain = ( certification, CA ) => {
  * @param {boolean?} options.returnsKey
  * @returns {{path:string,key?:Buffer}}
  */
-exports.getKeyFromCert = ( certification, type = 'privateKey', options = { } ) => {
+exports.getKeyFromX509 = ( certification, type = 'privateKey', options = { } ) => {
 
     const { password, returnsKey } = options
 
     if ( Buffer.isBuffer ( certification ) ) certification = IO.writeTmpFile ( certification )
 
-    const tmpFile = IO.getTmpFile ( )
+    const tmpFile = IO.getTmpFile ( 'pem' )
 
     const params = [ 'rsa', '-in', certification, '-out', tmpFile ]
 
@@ -116,15 +147,34 @@ exports.getKeyFromCert = ( certification, type = 'privateKey', options = { } ) =
 }
 
 
+/**
+ *
+ * @param {string|Buffer} certification
+ * @param {'publicKey'|'privateKey'} type
+ * @param options
+ * @param {string?} options.password
+ * @param {boolean?} options.returnsKey
+ * @returns {{path:string,key?:Buffer}}
+ */
+exports.getKeyFromPKCS12 = ( certification, type = 'privateKey', options = { } ) => {
+
+    const { password, returnsKey } = options
+
+    const x509 = exports.getX509FromPKCS12 ( certification, { password } )
+
+    return exports.getKeyFromX509 ( x509, type, { returnsKey } )
+}
+
+
 
 /**
  * 获取证书序列号
- * @param certification
+ * @param {string|Buffer} certification
  * @param options
  * @param {string?} options.password
  * @returns {string}
  */
-exports.getSerialNumberFromCert = ( certification, options = {　} ) => {
+exports.getSerialNumberFromX509 = ( certification, options = {　} ) => {
 
     const { password } = options
 
@@ -141,4 +191,20 @@ exports.getSerialNumberFromCert = ( certification, options = {　} ) => {
     if ( !stdout.startsWith ( 'serial=' ) ) throw new Error ( 'Cannot read serial number' )
 
     return stdout.slice ( 7 ).trim ( )
+}
+
+
+
+/**
+ * 获取证书序列号
+ * @param {string|Buffer} certification
+ * @param options
+ * @param {string?} options.password
+ * @returns {string}
+ */
+exports.getSerialNumberFromPKCS12 = ( certification, options = {　} ) => {
+
+    const x509 = exports.getX509FromPKCS12 ( certification, options )
+
+    return exports.getSerialNumberFromX509 ( x509 )
 }

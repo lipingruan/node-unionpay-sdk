@@ -5,8 +5,9 @@
 - [x] 银联响应数据及回调通知验证(证书链验证)
 - [ ] 云闪付APP支付 [appTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=450&acpAPIId=765&bussType=0)
 - [ ] 统一支付接口 [trans](https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=568&acpAPIId=740&bussType=1)
-- [ ] 消费撤销/退款 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=755&apiservId=448&version=V2.2&bussType=0)
-- [ ] 交易状态查询 [queryTrans](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=757&apiservId=448&version=V2.2&bussType=0)
+- [x] 当日消费撤销 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=766&apiservId=450&version=V2.2&bussType=0)
+- [ ] 退款 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=755&apiservId=448&version=V2.2&bussType=0)
+- [x] 交易状态查询 [queryTrans](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=757&apiservId=448&version=V2.2&bussType=0)
 - [ ] 银联加密公钥更新查询 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=758&apiservId=448&version=V2.2&bussType=0)
 
 ## 环境依赖
@@ -25,7 +26,8 @@ const Unionpay = require ( '@lipingruan/node-unionpay-sdk' )
 const unionpay = new Unionpay ( {
     sandbox: true,
     merId: '商户号',
-    consumeCallbackUrl: '后台回调地址',
+    consumeCallbackUrl: '付款成功回调地址',
+    cancelOrderCallbackUrl: '订单撤销后台回调地址',
     certification: 'pfx证书',
     certificationPassword: 'pfx证书密码',
     unionpayRootCA: '银联根证书',
@@ -47,7 +49,8 @@ const unionpay = new Unionpay ( {
 | unionpayRootCA | string/buffer | null | 银联根证书 |
 | unionpayMiddleCA | string/buffer | null | 银联中级证书 |
 | merId | string | null | 商户号 |
-| consumeCallbackUrl | string | null | 后台回调地址 |
+| consumeCallbackUrl | string | null | 付款成功回调地址 |
+| cancelOrderCallbackUrl | string | null | [撤销订单回调地址](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=766&apiservId=450&version=V2.2&bussType=0) |
 | accessType | string | 0 | [接入类型](https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=448&acpAPIId=754&bussType=0) |
 | channelType | string | 07 | 渠道类型 |
 | currencyCode | string | 156 | 交易货币代码 |
@@ -75,6 +78,27 @@ try {
     
     console.error ( '银联下单失败:', error.message )
 }
+```
+
+## 订单查询
+```javascript
+const { status, queryId, body } = await unionpay.queryOrder ( {
+    orderId: '付款单号/撤单单号/退款单号',
+} )
+// status SUCCESS: 成功, PENDING: 处理中, FAIL: 失败
+// queryId 为银联流水号，存到数据库
+// body 为响应原始数据
+```
+
+## 当日消费撤销
+```javascript
+const body = await unionpay.cancelOrder ( {
+    orderId: '撤单单号，不是付款单号',
+    queryId: '原订单的银联流水号，查付款订单或者付款回调里的queryId',
+    amount: 100, // 订单金额， 必须与原订单一致
+} )
+// body 为响应原始数据
+// 没报错表示发送成功，后续接收cancelOrderCallbackUrl回调或主动调用queryOrder接口查询
 ```
 
 ## 银联数据验证

@@ -122,7 +122,7 @@ exports.buffer2stream = function ( buffer ) {
  * @param {http.IncomingMessage} request
  * @returns {Object|String}
  */
-exports.parseBody = async function ( request ) {
+exports.parseBody = async function ( request, responseType ) {
 
   if ( request.method === 'GET' ) return null;
 
@@ -137,14 +137,30 @@ exports.parseBody = async function ( request ) {
 
   let contentType = request.headers [ 'content-type' ]
 
+  let contentTypeUnwrapped = ''
+
   let charset = 'utf8'
 
+  if ( responseType ) {
+
+    switch ( responseType ) {
+
+      case 'json':
+        contentTypeUnwrapped = 'application/json'
+        break;
+
+      case 'form':
+        contentTypeUnwrapped = 'application/x-www-form-urlencoded'
+        break;
+    }
+  }
+
+  if ( !contentTypeUnwrapped && contentType ) {
   // application/json; charset=utf-8
-  if ( contentType ) {
 
     const s = contentType.split ( ';' )
 
-    contentType = s [ 0 ].trim ( )
+    contentTypeUnwrapped = s [ 0 ].trim ( )
 
     let index = 0, size = s.length
 
@@ -172,7 +188,7 @@ exports.parseBody = async function ( request ) {
 
   try {
 
-    switch ( contentType ) {
+    switch ( contentTypeUnwrapped ) {
 
       case 'text/plain':
         if ( !string.startsWith ( '{' ) && !string.startsWith ( '[' ) ) break
@@ -199,9 +215,10 @@ exports.parseBody = async function ( request ) {
  * @param {String|URL} options.url
  * @param {*} body 
  * @param {'json'|'form'|'text'} bodyType
+ * @param {'json'|'form'|'text'} responseType
  * @returns {Promise<{body:*,headers:http.IncomingHttpHeaders}>}
  */
-exports.http = function ( options, body, bodyType = 'json' ) {
+exports.http = function ( options, body, bodyType = 'json', responseType ) {
 
   return new Promise ( function ( resolve, reject ) {
 
@@ -220,7 +237,7 @@ exports.http = function ( options, body, bodyType = 'json' ) {
         try {
   
           resolve ( { 
-            body: await exports.parseBody ( response ), 
+            body: await exports.parseBody ( response, responseType ),
             headers 
           } );
         } catch ( error ) {
@@ -264,6 +281,8 @@ exports.http = function ( options, body, bodyType = 'json' ) {
           bodyString = String ( body )
           break
       }
+
+      console.log ( bodyString )
 
       request.setHeader ( 'Content-Length', Buffer.byteLength ( bodyString ) );
 

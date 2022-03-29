@@ -1,7 +1,7 @@
 {
   "name": "@lipingruan/node-unionpay-sdk",
   "private": false,
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "nodejs unionpay sdk",
   "main": "unionpay.js",
   "scripts": {
@@ -11,7 +11,7 @@
     "type": "git",
     "url": "git+https://github.com/lipingruan/node-unionpay-sdk.git"
   },
-  "keywords": [],
+  "keywords": ["unionpay","银联","云闪付", "yunshanfu"],
   "author": "lipingruan",
   "license": "MIT",
   "bugs": {
