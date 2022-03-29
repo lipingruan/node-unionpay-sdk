@@ -126,6 +126,7 @@ module.exports = class Unionpay {
     urls = {
         [secured]: this.urlPrefix,
         get frontTransReq ( ) { return this[secured] + '/gateway/api/frontTransReq.do' },
+        get appTransReq ( ) { return this[secured] + '/gateway/api/appTransReq.do' },
         get backTransReq ( ) { return this[secured] + '/gateway/api/backTransReq.do' },
         get queryTrans ( ) { return this[secured] + '/gateway/api/queryTrans.do' },
     }
@@ -344,9 +345,89 @@ module.exports = class Unionpay {
 
         const { location } = headers
 
-        if ( body || !location ) throw new Error ( '网关接口调用异常' )
+        if ( body || !location ) {
+
+            if ( 'string' === typeof body ) {
+
+                const errorWrapped = body.match ( /end_error\"\>.*\<\// )
+
+                if ( errorWrapped ) {
+
+                    const errorMessage = errorWrapped [ 0 ].slice ( 11, -2 )
+
+                    throw new Error ( errorMessage )
+                }
+            }
+            
+            throw new Error ( '网关接口调用异常' )
+        }
 
         return { redirect: location }
+    }
+
+
+
+    /**
+     * APP跳转云闪付支付
+     * @see {@link https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=765&apiservId=450&version=V2.2&bussType=0}
+     * @param {{
+     * orderId: string,
+     * amount: number,
+     * attach?: *,
+     * description?: string,
+     * consumeTargetUrl?: string,
+     * }} form
+     * @returns {Promise<{redirect:string}>}
+     */
+    async createAppOrder ( form ) {
+
+        const { orderId, amount, description, attach, consumeTargetUrl, ...others } = form
+
+        const { certId, merId, encoding, version, accessType, currencyCode, consumeCallbackUrl } = this.#config
+
+        const txnTime =  Time.format ( new Date, 'YYYYMMDDhhmmss' )
+        
+        const sendBody = {
+            txnType: '01',
+            txnSubType: '01',
+            bizType: '000201',
+            channelType: '08',
+            frontUrl: consumeTargetUrl,
+            orderDesc: description,
+            orderId,
+            txnAmt: amount,
+            txnTime,
+
+            // 固定参数
+            certId, merId, encoding, version,
+            accessType,
+            currencyCode,
+            backUrl: consumeCallbackUrl,
+
+            ...others,
+        }
+
+        if ( attach ) sendBody.reqReserved = 'string' === typeof attach ? attach : JSON.stringify ( attach )
+
+        this.signAndMinifyForm ( sendBody )
+
+        const { body: source } = await IO.http ( this.urls.appTransReq, sendBody, 'form' )
+
+        const body = this.responseBodyParse ( source )
+
+        const verified = this.getResponseVerify ( body )
+
+        if ( !verified ) throw new Error ( '银联返回数据验证失败' )
+
+        const { respCode, respMsg, tn } = body
+
+        if ( respCode === '00' && tn ) {
+            
+            return { tn }
+        } else {
+
+            throw new Error ( respMsg || '银联系统错误:下单失败' )
+        }
     }
 
 
@@ -358,6 +439,7 @@ module.exports = class Unionpay {
      * @param {string} form.orderId 商户订单号
      * @returns {Promise<null|{
      * body: *,
+     * queryId: string,
      * status: 'PENDING'|'SUCCESS'|'FAIL'
      * }>}
      */
@@ -410,10 +492,10 @@ module.exports = class Unionpay {
             }
         } else if ( respCode === '34' ) {
             // 订单不存在
-            return null
+            throw new Error ( '银联系统错误:订单不存在' )
         } else {
 
-            throw new Error ( respMsg || '银联订单查询失败' )
+            throw new Error ( respMsg || '银联系统错误:查询失败' )
         }
     }
 
@@ -475,7 +557,7 @@ module.exports = class Unionpay {
             return body
         } else {
 
-            throw new Error ( respMsg || '银联订单撤销失败' )
+            throw new Error ( respMsg || '银联系统错误:撤销失败' )
         }
     }
 }

@@ -71,7 +71,7 @@ exports.verifySigningChain = ( certification, CA ) => {
 
     const stderr = task.stderr.toString ( ).trim ( )
 
-    return stdout.endsWith ( 'OK' )
+    return stdout.endsWith ( 'OK' ) || stderr.endsWith ( 'OK' )
 }
 
 
@@ -99,7 +99,7 @@ exports.getX509FromPKCS12 = ( certification, options ) => {
 
     const stderr = task.stderr.toString ( ).trim ( )
 
-    if ( stderr ) throw new Error ( stderr )
+    if ( stderr && !stderr.endsWith ( 'OK' ) ) throw new Error ( stderr )
 
     return savePath
 }
@@ -180,7 +180,7 @@ exports.getSerialNumberFromX509 = ( certification, options = {　} ) => {
 
     if ( Buffer.isBuffer ( certification ) ) certification = IO.writeTmpFile ( certification )
 
-    const params = [ 'x509', '-in', certification, '-serial', '-nocert' ]
+    const params = [ 'x509', '-in', certification, '-serial', '-noout' ]
 
     if ( password ) params.push ( '-passin', 'pass:' + password )
 
@@ -188,9 +188,13 @@ exports.getSerialNumberFromX509 = ( certification, options = {　} ) => {
 
     const stdout = task.stdout.toString ( ).trim ( )
 
-    if ( !stdout.startsWith ( 'serial=' ) ) throw new Error ( 'Cannot read serial number' )
+    if ( stdout.startsWith ( 'serial=' ) ) return stdout.slice ( 7 ).trim ( )
 
-    return stdout.slice ( 7 ).trim ( )
+    const stderr = task.stderr.toString ( ).trim ( )
+
+    if ( stderr.startsWith ( 'serial=' ) ) return stderr.slice ( 7 ).trim ( )
+
+    throw new Error ( 'Cannot read serial number' )
 }
 
 

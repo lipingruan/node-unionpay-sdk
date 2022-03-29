@@ -1,9 +1,9 @@
 # node-unionpay-sdk
 
-银联支付 NodeJS SDK, 目前支持如下:
+银联支付/云闪付 NodeJS SDK, 目前支持如下:
 - [x] 在线网关支付 [frontTransReq](https://open.unionpay.com/tjweb/api/dictionary?apiSvcId=448) 
 - [x] 银联响应数据及回调通知验证(证书链验证)
-- [ ] 云闪付APP支付 [appTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=450&acpAPIId=765&bussType=0)
+- [x] 云闪付APP支付 [appTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=450&acpAPIId=765&bussType=0)
 - [ ] 统一支付接口 [trans](https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=568&acpAPIId=740&bussType=1)
 - [x] 当日消费撤销 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=766&apiservId=450&version=V2.2&bussType=0)
 - [ ] 退款 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=755&apiservId=448&version=V2.2&bussType=0)
@@ -11,12 +11,17 @@
 - [ ] 银联加密公钥更新查询 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=758&apiservId=448&version=V2.2&bussType=0)
 
 ## 环境依赖
-1. 目前测试 Node 14.15.1 版本正常运行
-2. Windows 需要安装 openssl, [点击下载](http://slproweb.com/download/Win64OpenSSL-3_0_2.msi)
+1. 目前测试 Node [14.15.1](https://nodejs.org/en/download/releases/) 及以上版本正常运行
+2. Windows 需要安装 openssl 并添加到运行环境, [点击下载OpenSSL_1_1_1.msi](http://slproweb.com/download/Win64OpenSSL-1_1_1n.msi)
 
 ## 安装
+#### npm
 ```bash
 npm install @lipingruan/node-unionpay-sdk
+```
+#### yarn
+```bash
+yarn add @lipingruan/node-unionpay-sdk
 ```
 
 ## 初始化
@@ -26,7 +31,7 @@ const Unionpay = require ( '@lipingruan/node-unionpay-sdk' )
 const unionpay = new Unionpay ( {
     sandbox: true,
     merId: '商户号',
-    consumeCallbackUrl: '付款成功回调地址',
+    consumeCallbackUrl: '付款成功后台回调地址',
     cancelOrderCallbackUrl: '订单撤销后台回调地址',
     certification: 'pfx证书',
     certificationPassword: 'pfx证书密码',
@@ -55,11 +60,11 @@ const unionpay = new Unionpay ( {
 | channelType | string | 07 | 渠道类型 |
 | currencyCode | string | 156 | 交易货币代码 |
 
-## 在线网关支付
+## 在线Web网关支付
 ```javascript
 try {
 
-    const { redirect } = await unionpay.frontTransReq ( {
+    const { redirect } = await unionpay.createWebOrder ( {
         // required:string 商户订单号
         orderId: '20220307968496436', 
         // required:number 交易金额, 单位:分
@@ -68,12 +73,35 @@ try {
         description: '这是交易描述', 
         // optional:string 附加数据, 回调原样返回
         attach: 'a=1&b=2', 
-        // optional:string 渠道类型, 07:PC/平板,09:手机
+        // required:string 渠道类型, 07:PC/平板,09:手机
         channelType: '07', 
         // required:string 前端付款完成后跳转页面
         consumeTargetUrl: 'https://xxx.com/order?id=20220307968496436'
     } )
     // redirect 为银联付款网页链接
+} catch ( error ) {
+    
+    console.error ( '银联下单失败:', error.message )
+}
+```
+
+## 云闪付APP支付
+```javascript
+try {
+
+    const { tn } = await unionpay.createAppOrder ( {
+        // required:string 商户订单号
+        orderId: '20220307968496436', 
+        // required:number 交易金额, 单位:分
+        amount: 100, 
+        // required:string 交易描述
+        description: '这是交易描述', 
+        // optional:string 附加数据, 回调原样返回
+        attach: 'a=1&b=2', 
+        // required:string 前端付款完成后跳转页面
+        consumeTargetUrl: 'https://xxx.com/order?id=20220307968496436'
+    } )
+    // tn 为银联受理订单号, 调起云闪付支付使用
 } catch ( error ) {
     
     console.error ( '银联下单失败:', error.message )

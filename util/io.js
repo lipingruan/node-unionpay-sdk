@@ -282,8 +282,6 @@ exports.http = function ( options, body, bodyType = 'json', responseType ) {
           break
       }
 
-      console.log ( bodyString )
-
       request.setHeader ( 'Content-Length', Buffer.byteLength ( bodyString ) );
 
       request.method = 'POST';
