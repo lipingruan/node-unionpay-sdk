@@ -1,13 +1,13 @@
 # node-unionpay-sdk
 
 银联支付/云闪付 NodeJS SDK, 目前支持如下:
-- [x] 在线网关支付 [frontTransReq](https://open.unionpay.com/tjweb/api/dictionary?apiSvcId=448) 
-- [x] 银联响应数据及回调通知验证(证书链验证)
-- [x] 云闪付APP支付 [appTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=450&acpAPIId=765&bussType=0)
+- [x] 在线网关支付 [createWebOrder](#在线web网关支付) 
+- [x] 银联响应数据及回调通知验证(证书链验证) [getResponseVerify](#银联数据验证)
+- [x] 云闪付APP支付 [createAppOrder](#云闪付app支付)
 - [ ] 统一支付接口 [trans](https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=568&acpAPIId=740&bussType=1)
-- [x] 当日消费撤销 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=766&apiservId=450&version=V2.2&bussType=0)
+- [x] 当日消费撤销 [cancelOrder](#当日消费撤销)
 - [ ] 退款 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=755&apiservId=448&version=V2.2&bussType=0)
-- [x] 交易状态查询 [queryTrans](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=757&apiservId=448&version=V2.2&bussType=0)
+- [x] 交易状态查询 [queryOrder](#订单查询)
 - [ ] 银联加密公钥更新查询 [backTransReq](https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=758&apiservId=448&version=V2.2&bussType=0)
 
 ## 环境依赖
