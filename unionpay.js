@@ -45,6 +45,8 @@ module.exports = class Unionpay {
         consumeCallbackUrl: '',
         // 撤销订单回调地址
         cancelOrderCallbackUrl: '',
+        // 退款订单回调地址
+        refundOrderCallbackUrl: '',
 
         /**
          * 0:直连,1:服务商,2:平台商户
@@ -289,43 +291,34 @@ module.exports = class Unionpay {
 
 
 
-    frontTransReq ( form ) {
-
-        return this.createWebOrder ( form )
-    }
-
-
-
     /**
      * Web跳转网关支付
      * @see {@link https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=448&acpAPIId=754&bussType=0}
      * @param {{
      * orderId: string,
-     * amount: number,
-     * attach?: *,
-     * description?: string,
+     * txnTime: string | number | Date,
+     * txnAmt: number,
+     * reqReserved?: *,
+     * orderDesc?: string,
      * channelType?: string,
-     * consumeTargetUrl?: string,
+     * frontUrl?: string,
+     * backUrl?: string,
      * }} form
      * @returns {Promise<{redirect:string}>}
      */
     async createWebOrder ( form ) {
 
-        const { orderId, amount, description, attach, channelType: newChannelType, consumeTargetUrl, ...others } = form
+        let { txnTime, reqReserved, channelType: newChannelType, ...others } = form
 
         const { certId, merId, encoding, version, accessType, channelType, currencyCode, consumeCallbackUrl } = this.#config
 
-        const txnTime =  Time.format ( new Date, 'YYYYMMDDhhmmss' )
+        if ( [ 'number', 'object' ].includes ( typeof txnTime ) ) txnTime =  Time.format ( txnTime, 'YYYYMMDDhhmmss' )
         
         const sendBody = {
             txnType: '01',
             txnSubType: '01',
             bizType: '000201',
             channelType: newChannelType || channelType,
-            frontUrl: consumeTargetUrl,
-            orderDesc: description,
-            orderId,
-            txnAmt: amount,
             txnTime,
 
             // 固定参数
@@ -337,7 +330,7 @@ module.exports = class Unionpay {
             ...others,
         }
 
-        if ( attach ) sendBody.reqReserved = 'string' === typeof attach ? attach : JSON.stringify ( attach )
+        if ( reqReserved ) sendBody.reqReserved = 'string' === typeof reqReserved ? reqReserved : JSON.stringify ( reqReserved )
 
         this.signAndMinifyForm ( sendBody )
 
@@ -372,30 +365,27 @@ module.exports = class Unionpay {
      * @see {@link https://open.unionpay.com/tjweb/acproduct/APIList?acpAPIId=765&apiservId=450&version=V2.2&bussType=0}
      * @param {{
      * orderId: string,
-     * amount: number,
-     * attach?: *,
-     * description?: string,
-     * consumeTargetUrl?: string,
+     * txnTime: number | Date | string,
+     * txnAmt: number,
+     * reqReserved?: *,
+     * orderDesc?: string,
+     * frontUrl?: string,
      * }} form
-     * @returns {Promise<{redirect:string}>}
+     * @returns {Promise<{tn:string}>}
      */
     async createAppOrder ( form ) {
 
-        const { orderId, amount, description, attach, consumeTargetUrl, ...others } = form
+        let { txnTime, reqReserved, ...others } = form
 
         const { certId, merId, encoding, version, accessType, currencyCode, consumeCallbackUrl } = this.#config
 
-        const txnTime =  Time.format ( new Date, 'YYYYMMDDhhmmss' )
+        if ( [ 'number', 'object' ].includes ( typeof txnTime ) ) txnTime =  Time.format ( txnTime, 'YYYYMMDDhhmmss' )
         
         const sendBody = {
             txnType: '01',
             txnSubType: '01',
             bizType: '000201',
             channelType: '08',
-            frontUrl: consumeTargetUrl,
-            orderDesc: description,
-            orderId,
-            txnAmt: amount,
             txnTime,
 
             // 固定参数
@@ -407,7 +397,7 @@ module.exports = class Unionpay {
             ...others,
         }
 
-        if ( attach ) sendBody.reqReserved = 'string' === typeof attach ? attach : JSON.stringify ( attach )
+        if ( reqReserved ) sendBody.reqReserved = 'string' === typeof reqReserved ? reqReserved : JSON.stringify ( reqReserved )
 
         this.signAndMinifyForm ( sendBody )
 
@@ -436,7 +426,8 @@ module.exports = class Unionpay {
      * 查询订单状态
      * @see {@link https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=450&acpAPIId=768&bussType=0}
      * @param form
-     * @param {string} form.orderId 商户订单号
+     * @param {string} form.orderId 支付、撤销、退款订单号
+     * @param {number|Date|string} form.txnTime 订单创建时间
      * @returns {Promise<null|{
      * body: *,
      * queryId: string,
@@ -445,17 +436,16 @@ module.exports = class Unionpay {
      */
     async queryOrder ( form ) {
 
-        const { orderId, ...others } = form
+        let { txnTime, ...others } = form
 
         const { certId, merId, encoding, version, accessType } = this.#config
 
-        const txnTime = Time.format ( new Date ( ), 'YYYYMMDDhhmmss' )
+        if ( [ 'number', 'object' ].includes ( typeof txnTime ) ) txnTime =  Time.format ( txnTime, 'YYYYMMDDhhmmss' )
 
         const sendBody = {
             txnType: '00',
             txnSubType: '00',
             bizType: '000802',
-            orderId,
             txnTime,
 
             // 固定参数
@@ -502,43 +492,39 @@ module.exports = class Unionpay {
 
 
     /**
-     * 当天已支付订单撤销
-     * @see {@link https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=448&acpAPIId=755&bussType=0#nav09}
+     * 退款、撤单等对原订单进行操作下单
      * @param form
-     * @param {string} form.orderId
-     * @param {string} form.queryId
-     * @param {number} form.amount
-     * @param {string} form.channelType
-     * @param {string} form.attach
+     * @param {string} form.orderId 单号，非原订单单号
+     * @param {string} form.origQryId 原订单的 queryId
+     * @param {number|Date|string} form.txnTime 下单时间
+     * @param {number} form.txnAmt 原订单的金额
+     * @param {string} form.channelType 原订单的渠道
+     * @param {string} form.reqReserved 附加回调数据
+     * @param {string} form.txnType 交易类型
      * @returns {Promise<*>}
      */
-    async cancelOrder ( form ) {
+    async unifyOrderForOrder ( form ) {
 
-        const { orderId, queryId, amount, channelType: newChannelType, attach, ...others } = form
+        let { txnTime, channelType: newChannelType, reqReserved, ...others } = form
 
-        const { certId, merId, encoding, version, accessType, channelType, cancelOrderCallbackUrl } = this.#config
+        const { certId, merId, encoding, version, accessType, channelType } = this.#config
 
-        const txnTime = Time.format ( new Date ( ), 'YYYYMMDDhhmmss' )
+        if ( [ 'number', 'object' ].includes ( typeof txnTime ) ) txnTime =  Time.format ( txnTime, 'YYYYMMDDhhmmss' )
 
         const sendBody = {
-            bizType: '000000',
-            origQryId: queryId,
-            txnTime,
-            orderId,
-            txnAmt: amount,
-            txnType: '31',
+            bizType: '000201',
             txnSubType: '00',
+            txnTime,
             channelType: newChannelType || channelType,
 
             // 固定参数
             certId, merId, encoding, version,
             accessType,
-            backUrl: cancelOrderCallbackUrl,
 
             ...others,
         }
 
-        if ( attach ) sendBody.reqReserved = 'string' === typeof attach ? attach : JSON.stringify ( attach )
+        if ( reqReserved ) sendBody.reqReserved = 'string' === typeof reqReserved ? reqReserved : JSON.stringify ( reqReserved )
 
         this.signAndMinifyForm ( sendBody )
 
@@ -557,7 +543,53 @@ module.exports = class Unionpay {
             return body
         } else {
 
-            throw new Error ( respMsg || '银联系统错误:撤销失败' )
+            throw new Error ( respMsg || '银联系统错误:操作失败' )
         }
+    }
+
+
+
+    /**
+     * 当天已支付订单撤销
+     * @see {@link https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=448&acpAPIId=755&bussType=0#nav09}
+     * @param form
+     * @param {string} form.orderId '撤销订单'的单号，非支付订单
+     * @param {string} form.origQryId 原支付订单的 queryId
+     * @param {number|Date|string} form.txnTime 撤销时间
+     * @param {number} form.txnAmt 原支付订单的金额
+     * @param {string} form.channelType 原支付订单的渠道
+     * @param {string} form.reqReserved 附加回调数据
+     * @returns {Promise<*>}
+     */
+    async cancelOrder ( form ) {
+
+        form.txnType = '31'
+
+        if ( !form.backUrl ) form.backUrl = this.#config.cancelOrderCallbackUrl
+
+        return await this.unifyOrderForOrder ( form )
+    }
+
+
+
+    /**
+     * 退款
+     * @see {@link https://open.unionpay.com/tjweb/acproduct/APIList?apiservId=450&acpAPIId=767&bussType=0}
+     * @param form
+     * @param {string} form.orderId '退款订单'的单号，非支付订单
+     * @param {string} form.origQryId 原支付订单的 queryId
+     * @param {number|Date|string} form.txnTime 退款时间
+     * @param {number} form.txnAmt 原支付订单的金额
+     * @param {string} form.channelType 原支付订单的渠道
+     * @param {string} form.reqReserved 附加回调数据
+     * @returns {Promise<*>}
+     */
+    async refundOrder ( form ) {
+
+        form.txnType = '04'
+
+        if ( !form.backUrl ) form.backUrl = this.#config.refundOrderCallbackUrl
+
+        return await this.unifyOrderForOrder ( form )
     }
 }
