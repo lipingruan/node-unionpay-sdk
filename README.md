@@ -149,9 +149,9 @@ const body = await unionpay.cancelOrder ( {
     // required:Date 撤销时间
     txnTime,
     // required:string 原支付订单银联流水号
-    queryId: '原订单的银联流水号，查已付款订单或者付款回调里的queryId',
+    origQryId: '原订单的银联流水号，查已付款订单或者付款回调里的queryId',
     // required:number 订单金额，必须与原订单一致
-    amount: 100,
+    txnAmt: 100,
     // optional:string 撤销完成后台回调地址，不传则使用初始化配置的 cancelOrderCallbackUrl
     backUrl: 'https://xxx.com/payment/cancel/callback',
     // ...以及其它任何官方字段
@@ -171,9 +171,9 @@ const body = await unionpay.cancelOrder ( {
     // required:Date 退款时间
     txnTime,
     // required:string 原支付订单银联流水号
-    queryId: '原订单的银联流水号，查已付款订单或者付款回调里的queryId',
+    origQryId: '原订单的银联流水号，查已付款订单或者付款回调里的queryId',
     // required:number 订单金额，必须与原订单一致
-    amount: 100,
+    txnAmt: 100,
     // optional:string 撤销完成后台回调地址，不传则使用初始化配置的 refundOrderCallbackUrl
     backUrl: 'https://xxx.com/payment/refund/callback',
     // ...以及其它任何官方字段
